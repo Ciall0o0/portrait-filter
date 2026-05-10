@@ -30,7 +30,7 @@ class OpenAIService:
     def __init__(self):
         self._client = None
         self.semaphore = asyncio.Semaphore(settings.concurrency_limit)
-        self.min_interval = 60.0 / settings.rate_limit_per_min
+        self.min_interval = 60.0 / max(settings.rate_limit_per_min, 1)
 
     def _get_client(self) -> AsyncOpenAI:
         if self._client is None:

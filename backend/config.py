@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
 
     batch_size: int = 5
     concurrency_limit: int = 2
-    rate_limit_per_min: int = 30
+    rate_limit_per_min: int = Field(default=30, ge=1)
 
     thumbnail_size: int = 300
     max_image_dim: int = 2048

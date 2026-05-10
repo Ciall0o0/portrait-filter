@@ -102,6 +102,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false,  // Allow file:// origin to reach http://127.0.0.1:18903
     },
     backgroundColor: "#0f0f1a",
   });

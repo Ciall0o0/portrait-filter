@@ -1,10 +1,10 @@
-import { useState, useCallback, useMemo } from "react";
-import { ThemeProvider, CssBaseline, Box, Typography } from "@mui/material";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { ThemeProvider, CssBaseline, Box, Typography, Alert } from "@mui/material";
 import { SnackbarProvider } from "notistack";
 
 import theme from "./theme";
 import { useAppStore } from "./store/appStore";
-import { listImages } from "./api/endpoints";
+import { listImages, getConfig } from "./api/endpoints";
 import { useAssessment } from "./hooks/useAssessment";
 
 import AppBarTop from "./components/layout/AppBarTop";
@@ -23,6 +23,7 @@ export default function App() {
   const [configOpen, setConfigOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [backendOk, setBackendOk] = useState<boolean | null>(null); // null = checking
 
   const currentFolder = useAppStore((s) => s.currentFolder);
   const setCurrentFolder = useAppStore((s) => s.setCurrentFolder);
@@ -37,6 +38,12 @@ export default function App() {
   const setLastUndoOpId = useAppStore((s) => s.setLastUndoOpId);
 
   const { cancelAssessment, runAssessment } = useAssessment();
+
+  useEffect(() => {
+    getConfig()
+      .then(() => setBackendOk(true))
+      .catch(() => setBackendOk(false));
+  }, []);
 
   const handleFolderSelected = useCallback(
     async (path: string) => {
@@ -87,6 +94,12 @@ export default function App() {
             onOpenSettings={() => setConfigOpen(true)}
             onOpenExport={() => setExportOpen(true)}
           />
+
+          {backendOk === false && (
+            <Alert severity="error" sx={{ mx: 2, mt: 1, borderRadius: 3 }}>
+              无法连接到后端服务 — 请确认后端已在端口 18903 启动
+            </Alert>
+          )}
 
           {currentFolder && (
             <GalleryToolbar

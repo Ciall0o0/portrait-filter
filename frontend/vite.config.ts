@@ -7,11 +7,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:18903',
       '/api/assess/ws': {
         target: 'ws://localhost:18903',
         ws: true,
       },
+      '/api': 'http://localhost:18903',
     },
   },
 })
