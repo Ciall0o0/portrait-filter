@@ -1,0 +1,56 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Node.js (frontend + electron-builder) ----
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend deps and build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      # ---- Python (backend + PyInstaller) ----
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          uv sync
+
+      - name: Build backend with PyInstaller
+        run: |
+          cd backend
+          uv run pyinstaller --onefile --name portrait-filter-backend launcher.py
+
+      # ---- Electron packaging ----
+      - name: Install electron deps and build
+        run: |
+          cd electron
+          npm ci
+          npm run build:win
+
+      # ---- Upload artifact ----
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Portrait-Filter-Windows
+          path: electron/dist/*.exe

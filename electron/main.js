@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
+const fs = require("fs");
 
 const BACKEND_PORT = 18903;
 const isDev = process.argv.includes("--dev");
@@ -8,21 +9,52 @@ const isDev = process.argv.includes("--dev");
 let mainWindow = null;
 let pythonProcess = null;
 
+function findBackendBinary() {
+  // Production: look for PyInstaller-bundled .exe in extraResources
+  if (isDev) return null; // use uv run in dev
+
+  // electron-builder places extraResources into process.resourcesPath
+  const resourcesPath = process.resourcesPath || path.join(__dirname, "..");
+  const candidatePaths = [
+    path.join(resourcesPath, "backend", "portrait-filter-backend.exe"),
+    path.join(resourcesPath, "backend", "dist", "portrait-filter-backend.exe"),
+    path.join(__dirname, "..", "backend", "dist", "portrait-filter-backend.exe"),
+  ];
+
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      console.log(`Found bundled backend: ${p}`);
+      return p;
+    }
+  }
+
+  console.warn("No bundled backend binary found, falling back to uv");
+  return null;
+}
+
 function startPythonBackend() {
-  // Determine Python backend path
   const backendDir = path.join(__dirname, "..", "backend");
-  const pythonCmd = process.platform === "win32" ? "python" : "python3";
+  const backendBinary = findBackendBinary();
 
-  console.log(`Starting Python backend from: ${backendDir}`);
-
-  pythonProcess = spawn(pythonCmd, ["-m", "uvicorn", "main:app", "--port", String(BACKEND_PORT), "--host", "127.0.0.1"], {
-    cwd: backendDir,
-    env: {
-      ...process.env,
-      PYTHONUNBUFFERED: "1",
-    },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  if (backendBinary) {
+    // Production: use PyInstaller-bundled executable
+    console.log(`Starting bundled backend: ${backendBinary}`);
+    pythonProcess = spawn(backendBinary, [], {
+      env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT) },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } else {
+    // Development: use uv + uvicorn
+    console.log(`Starting Python backend from: ${backendDir}`);
+    pythonProcess = spawn(
+      "uv", ["run", "uvicorn", "main:app", "--port", String(BACKEND_PORT), "--host", "127.0.0.1"],
+      {
+        cwd: backendDir,
+        env: { ...process.env, PYTHONUNBUFFERED: "1" },
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+  }
 
   pythonProcess.stdout.on("data", (data) => {
     console.log(`[Python] ${data.toString().trim()}`);

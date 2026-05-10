@@ -21,23 +21,24 @@
     "files": [
       "main.js",
       "preload.js",
-      "../frontend/dist/**/*",
-      "../backend/**/*",
-      "!../backend/.venv/**",
-      "!../backend/.trash_backup/**",
-      "!../backend/cache.db"
+      "../frontend/dist/**/*"
     ],
     "extraResources": [
       {
-        "from": "../backend",
+        "from": "../backend/dist",
         "to": "backend",
         "filter": [
-          "**/*",
-          "!.venv",
-          "!.trash_backup",
-          "!cache.db"
+          "portrait-filter-backend.exe"
         ]
       }
-    ]
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    }
   }
 }
