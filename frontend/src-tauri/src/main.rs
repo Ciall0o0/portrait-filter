@@ -21,7 +21,9 @@ fn find_backend_binary() -> Option<PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
 
     let candidates = [
+        exe_dir.join("portrait-filter-backend-x86_64-pc-windows-msvc.exe"),
         exe_dir.join("portrait-filter-backend.exe"),
+        exe_dir.join("backend").join("portrait-filter-backend-x86_64-pc-windows-msvc.exe"),
         exe_dir.join("backend").join("portrait-filter-backend.exe"),
     ];
 
