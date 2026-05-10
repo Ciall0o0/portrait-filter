@@ -12,8 +12,8 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 const BACKEND_PORT: u16 = 18903;
-const POLL_RETRIES: u32 = 20;
-const POLL_INTERVAL_MS: u64 = 200;
+const POLL_RETRIES: u32 = 40;
+const POLL_INTERVAL_MS: u64 = 500;
 const CONNECT_TIMEOUT_SECS: u64 = 2;
 
 struct BackendProcess(Mutex<Option<Child>>);

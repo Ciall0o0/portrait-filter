@@ -38,9 +38,23 @@ export default function App() {
   const { cancelAssessment, runAssessment } = useAssessment();
 
   useEffect(() => {
-    getConfig()
-      .then(() => setBackendOk(true))
-      .catch(() => setBackendOk(false));
+    let cancelled = false;
+    const tryConnect = async (retries: number) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await getConfig();
+          if (!cancelled) setBackendOk(true);
+          return;
+        } catch {
+          if (i < retries - 1) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+      }
+      if (!cancelled) setBackendOk(false);
+    };
+    tryConnect(30); // up to 30s for first startup
+    return () => { cancelled = true; };
   }, []);
 
   const handleFolderSelected = useCallback(
