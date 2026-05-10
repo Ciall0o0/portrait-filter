@@ -1,17 +1,23 @@
+"""Config API — read and persist settings to .env file."""
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter
 
 from config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Use CWD so .env lives next to the exe (portable mode) or in backend dir (dev).
 # Electron sets cwd to backendDir (dev) or userData (production).
 ENV_FILE = Path(".").resolve() / ".env"
 
+# Fields that map 1:1 between .env keys and Settings attribute names
+_PERSIST_FIELDS = ["openai_api_key", "openai_base_url", "openai_model"]
 
-def _write_env(updates: dict):
+
+def _write_env(updates: dict) -> None:
     """Persist config updates to .env file (create if missing)."""
     if not ENV_FILE.exists():
         ENV_FILE.touch()
@@ -22,7 +28,7 @@ def _write_env(updates: dict):
         "OPENAI_MODEL": "openai_model",
     }
     new_lines = []
-    seen = set()
+    seen: set[str] = set()
     for line in lines:
         stripped = line.strip()
         if stripped and not stripped.startswith("#"):
@@ -54,19 +60,12 @@ async def get_config():
 
 @router.put("")
 async def update_config(updates: dict):
-    env_updates = {}
+    env_updates: dict[str, str] = {}
 
-    if "openai_api_key" in updates and updates["openai_api_key"]:
-        settings.openai_api_key = updates["openai_api_key"]
-        env_updates["openai_api_key"] = updates["openai_api_key"]
-
-    if "openai_base_url" in updates and updates["openai_base_url"]:
-        settings.openai_base_url = updates["openai_base_url"]
-        env_updates["openai_base_url"] = updates["openai_base_url"]
-
-    if "openai_model" in updates and updates["openai_model"]:
-        settings.openai_model = updates["openai_model"]
-        env_updates["openai_model"] = updates["openai_model"]
+    for field in _PERSIST_FIELDS:
+        if field in updates and updates[field]:
+            setattr(settings, field, updates[field])
+            env_updates[field] = updates[field]
 
     if "batch_size" in updates:
         settings.batch_size = int(updates["batch_size"])
@@ -78,7 +77,7 @@ async def update_config(updates: dict):
     if env_updates:
         try:
             _write_env(env_updates)
-        except Exception:
-            pass
+        except OSError:
+            logger.exception("Failed to persist settings to %s", ENV_FILE)
 
     return {"status": "ok"}

@@ -1,7 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
-const fs = require("fs");
+const http = require("http");
 
 const BACKEND_PORT = 18903;
 const isDev = process.argv.includes("--dev");
@@ -10,25 +10,23 @@ let mainWindow = null;
 let pythonProcess = null;
 
 function findBackendBinary() {
-  // Production: look for PyInstaller-bundled .exe in extraResources
-  if (isDev) return null; // use uv run in dev
+  if (isDev) return null;
 
   // electron-builder places extraResources into process.resourcesPath
   const resourcesPath = process.resourcesPath || path.join(__dirname, "..");
-  const candidatePaths = [
+  const candidates = [
     path.join(resourcesPath, "backend", "portrait-filter-backend.exe"),
-    path.join(resourcesPath, "backend", "dist", "portrait-filter-backend.exe"),
     path.join(__dirname, "..", "backend", "dist", "portrait-filter-backend.exe"),
   ];
 
-  for (const p of candidatePaths) {
-    if (fs.existsSync(p)) {
-      console.log(`Found bundled backend: ${p}`);
+  for (const p of candidates) {
+    try {
+      // Let spawn fail naturally if the binary is missing
+      require("fs").accessSync(p, require("fs").constants.X_OK);
       return p;
-    }
+    } catch { /* candidate not found, try next */ }
   }
 
-  console.warn("No bundled backend binary found, falling back to uv");
   return null;
 }
 
@@ -60,13 +58,9 @@ function startPythonBackend() {
     );
   }
 
-  pythonProcess.stdout.on("data", (data) => {
-    console.log(`[Python] ${data.toString().trim()}`);
-  });
-
-  pythonProcess.stderr.on("data", (data) => {
-    console.log(`[Python] ${data.toString().trim()}`);
-  });
+  const logOutput = (data) => console.log(`[Python] ${data.toString().trim()}`);
+  pythonProcess.stdout.on("data", logOutput);
+  pythonProcess.stderr.on("data", logOutput);
 
   pythonProcess.on("error", (err) => {
     console.error("Failed to start Python backend:", err.message);
@@ -136,14 +130,35 @@ ipcMain.handle("get-backend-port", () => {
   return BACKEND_PORT;
 });
 
+function waitForBackend(retries = 20, delay = 200) {
+  return new Promise((resolve, reject) => {
+    const attempt = (n) => {
+      const req = http.get(`http://127.0.0.1:${BACKEND_PORT}/api/config`, (res) => {
+        res.resume();
+        resolve();
+      });
+      req.on("error", () => {
+        if (n <= 1) return reject(new Error("Backend did not start in time"));
+        setTimeout(() => attempt(n - 1), delay);
+      });
+      req.setTimeout(1000, () => { req.destroy(); attempt(n - 1); });
+    };
+    attempt(retries);
+  });
+}
+
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   startPythonBackend();
 
-  // Wait a moment for backend to start, then create window
-  setTimeout(() => {
-    createWindow();
-  }, 2000);
+  try {
+    await waitForBackend();
+    console.log("Backend is ready");
+  } catch {
+    console.warn("Backend health check timed out, creating window anyway");
+  }
+
+  createWindow();
 });
 
 app.on("window-all-closed", () => {
@@ -159,6 +174,9 @@ app.on("before-quit", () => {
 
 app.on("activate", () => {
   if (mainWindow === null) {
+    if (pythonProcess === null) {
+      startPythonBackend();
+    }
     createWindow();
   }
 });

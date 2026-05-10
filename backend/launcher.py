@@ -8,10 +8,9 @@ def _resolve_cwd():
     # Use the directory containing the .exe (portable mode) or user data
     if getattr(sys, "frozen", False):
         # PyInstaller --onefile: work next to the .exe so users can find .env / cache.db
-        exe_dir = os.path.dirname(sys.executable)
-        return exe_dir
+        return os.path.dirname(sys.executable)
     # Development: use the backend project root
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(__file__)
 
 
 def main():
