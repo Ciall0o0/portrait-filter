@@ -68,7 +68,7 @@ jobs:
           uv sync
           uv run pyinstaller `
             --onefile `
-            --name portrait-filter-backend-x86_64-pc-windows-msvc `
+            --name portrait-filter-backend `
             --hidden-import uvicorn.loops.auto `
             --hidden-import uvicorn.protocols.http.auto `
             --hidden-import uvicorn.protocols.websockets.auto `
