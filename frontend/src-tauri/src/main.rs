@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 const BACKEND_PORT: u16 = 18903;
 const POLL_RETRIES: u32 = 20;
@@ -102,7 +103,7 @@ fn pipe_output(child: &mut Child) {
 }
 
 fn stop_backend(state: &tauri::State<BackendProcess>) {
-    let guard = match state.0.lock() {
+    let mut guard = match state.0.lock() {
         Ok(g) => g,
         Err(_) => return,
     };
