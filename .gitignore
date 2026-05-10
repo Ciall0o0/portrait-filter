@@ -8,7 +8,7 @@ backend/dist/
 backend/build/
 backend/*.spec
 *.pyc
-src-tauri/target/
-src-tauri/gen/
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
 .env
 .DS_Store

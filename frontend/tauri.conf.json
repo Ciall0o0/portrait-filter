@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.portrait-filter.app",
   "build": {
-    "frontendDist": "frontend/dist",
+    "frontendDist": "dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd frontend && npm run dev",
-    "beforeBuildCommand": "cd frontend && npm run build"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
@@ -34,7 +34,7 @@
       "src-tauri/icons/icon.ico"
     ],
     "externalBin": [
-      "backend/dist/portrait-filter-backend"
+      "../backend/dist/portrait-filter-backend"
     ],
     "windows": {
       "nsis": {
