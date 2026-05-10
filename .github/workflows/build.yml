@@ -39,7 +39,16 @@ jobs:
       - name: Build backend with PyInstaller
         run: |
           cd backend
-          uv run pyinstaller --onefile --name portrait-filter-backend launcher.py
+          uv run pyinstaller `
+            --onefile `
+            --name portrait-filter-backend `
+            --hidden-import uvicorn.loops.auto `
+            --hidden-import uvicorn.protocols.http.auto `
+            --hidden-import uvicorn.protocols.websockets.auto `
+            --hidden-import uvicorn.lifespan.auto `
+            --hidden-import anyio._backends._asyncio `
+            --hidden-import pydantic_settings `
+            launcher.py
 
       # ---- Electron packaging ----
       - name: Install electron deps and build

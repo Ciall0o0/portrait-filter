@@ -1,18 +1,20 @@
-import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from config import settings
 
 router = APIRouter()
-ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
+# Use CWD so .env lives next to the exe (portable mode) or in backend dir (dev).
+# Electron sets cwd to backendDir (dev) or userData (production).
+ENV_FILE = Path(".").resolve() / ".env"
 
 
 def _write_env(updates: dict):
-    """Persist config updates to .env file."""
+    """Persist config updates to .env file (create if missing)."""
     if not ENV_FILE.exists():
-        return
+        ENV_FILE.touch()
     lines = ENV_FILE.read_text().splitlines()
     key_map = {
         "OPENAI_API_KEY": "openai_api_key",

@@ -38,10 +38,14 @@ function startPythonBackend() {
 
   if (backendBinary) {
     // Production: use PyInstaller-bundled executable
-    console.log(`Starting bundled backend: ${backendBinary}`);
+    // Set cwd to userData so .env / cache.db / .trash_backup are writable
+    const cwd = app.getPath("userData");
+    console.log(`Starting bundled backend: ${backendBinary} (cwd: ${cwd})`);
     pythonProcess = spawn(backendBinary, [], {
+      cwd,
       env: { ...process.env, BACKEND_PORT: String(BACKEND_PORT) },
       stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
     });
   } else {
     // Development: use uv + uvicorn

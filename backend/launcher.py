@@ -1,16 +1,30 @@
 """PyInstaller entry point. Spawns the FastAPI backend via uvicorn."""
 import os
-import uvicorn
+import sys
+
+
+def _resolve_cwd():
+    """Return a writable working directory for DB, backups, and .env."""
+    # Use the directory containing the .exe (portable mode) or user data
+    if getattr(sys, "frozen", False):
+        # PyInstaller --onefile: work next to the .exe so users can find .env / cache.db
+        exe_dir = os.path.dirname(sys.executable)
+        return exe_dir
+    # Development: use the backend project root
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
+    cwd = _resolve_cwd()
+    os.chdir(cwd)
+
     port = int(os.environ.get("BACKEND_PORT", "18903"))
-    uvicorn.run(
-        "main:app",
-        host="127.0.0.1",
-        port=port,
-        log_level="info",
-    )
+
+    # Import app directly — string "main:app" breaks under PyInstaller
+    from main import app  # noqa: E402  (import after chdir so paths resolve)
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
 
 
 if __name__ == "__main__":

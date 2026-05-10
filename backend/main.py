@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,7 +10,16 @@ from fastapi.staticfiles import StaticFiles
 from db.database import init_db, cleanup_old_backups
 from routes import folders, images, assessment, actions, export, config
 
-FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+def _get_frontend_dist():
+    """Resolve frontend dist dir. Returns None when bundled with PyInstaller."""
+    if getattr(sys, "frozen", False):
+        return None  # Electron serves the frontend via loadFile
+    dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    return dist if dist.exists() else None
+
+
+FRONTEND_DIST = _get_frontend_dist()
 
 
 @asynccontextmanager
@@ -41,6 +51,6 @@ routers = [
 for router, prefix, tag in routers:
     app.include_router(router, prefix=prefix, tags=[tag])
 
-# Serve frontend static files in production
-if FRONTEND_DIST.exists():
+# Serve frontend static files in development / non-Electron mode
+if FRONTEND_DIST:
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
