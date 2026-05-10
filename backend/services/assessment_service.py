@@ -36,32 +36,49 @@ class AssessmentService:
         model = batch["model"]
         force = batch["force"]
         lock = asyncio.Lock()
+        chunk_size = settings.batch_size
 
-        async def process_one(path: str) -> dict:
-            file_hash = await asyncio.to_thread(compute_sha256, path)
+        async def process_one(path: str) -> dict | None:
+            try:
+                file_hash = await asyncio.to_thread(compute_sha256, path)
 
-            if not force:
-                cached = await cache_repo.get_cached_result(file_hash, model)
-                if cached:
-                    cached["image_id"] = file_hash
-                    return cached
+                if not force:
+                    cached = await cache_repo.get_cached_result(file_hash, model)
+                    if cached:
+                        cached["image_id"] = file_hash
+                        return cached
 
-            result = await self.openai_svc.assess_single(path)
-            result["image_id"] = file_hash
-            await cache_repo.put_cached_result(file_hash, path, model, result)
-            return result
+                result = await self.openai_svc.assess_single(path, model=model)
+                result["image_id"] = file_hash
+                await cache_repo.put_cached_result(file_hash, path, model, result)
+                return result
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception("Assessment failed for %s", path)
+                return {
+                    "image_id": await asyncio.to_thread(compute_sha256, path),
+                    "overall_score": 0,
+                    "is_portrait": False,
+                    "quality_issues": [],
+                    "ai_comment": f"评估失败: {e}",
+                    "assessed_at": "",
+                    "error": True,
+                }
 
-        async def process_with_progress(path: str) -> dict:
+        async def process_with_progress(path: str):
             result = await process_one(path)
             async with lock:
                 batch["results"].append(result)
                 batch["completed"] += 1
-                await progress_callback(self._status_dict(batch))
-            return result
+            await progress_callback(self._status_dict(batch))
 
         try:
-            tasks = [process_with_progress(path) for path in batch["image_paths"]]
-            await asyncio.gather(*tasks)
+            paths = batch["image_paths"]
+            # Process in chunks for true batching
+            for i in range(0, len(paths), chunk_size):
+                chunk = paths[i:i + chunk_size]
+                tasks = [process_with_progress(p) for p in chunk]
+                await asyncio.gather(*tasks)
             batch["status"] = "completed"
         except Exception:
             batch["status"] = "error"

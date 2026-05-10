@@ -31,16 +31,14 @@ class OpenAIService:
         self._client = None
         self.semaphore = asyncio.Semaphore(settings.concurrency_limit)
         self.min_interval = 60.0 / max(settings.rate_limit_per_min, 1)
+        self._last_call_time = 0.0
 
-    def _get_client(self) -> AsyncOpenAI:
-        if self._client is None:
-            if not settings.openai_api_key:
-                raise ValueError("OpenAI API key is not configured")
-            self._client = AsyncOpenAI(
-                base_url=settings.openai_base_url,
-                api_key=settings.openai_api_key,
-            )
-        return self._client
+    def _get_client(self, base_url: str = "", api_key: str = "") -> AsyncOpenAI:
+        url = base_url or settings.openai_base_url
+        key = api_key or settings.openai_api_key
+        if not key:
+            raise ValueError("OpenAI API key is not configured")
+        return AsyncOpenAI(base_url=url, api_key=key, timeout=60.0)
 
     async def test_connection(self, base_url: str, api_key: str, model: str) -> bool:
         """Test connectivity to the OpenAI-compatible API."""
@@ -70,13 +68,20 @@ class OpenAIService:
     async def _encode_image(self, image_path: Path) -> str:
         return await asyncio.to_thread(self._encode_image_sync, image_path)
 
-    async def assess_single(self, image_path: str) -> dict:
+    async def assess_single(
+        self, image_path: str, model: str | None = None,
+        base_url: str = "", api_key: str = "",
+    ) -> dict:
+        # Encode image BEFORE acquiring semaphore (I/O, no API rate limit)
+        data_uri = await self._encode_image(Path(image_path))
+
+        # Rate-limit: wait until we can make an API call
         async with self.semaphore:
-            data_uri = await self._encode_image(Path(image_path))
-            client = self._get_client()
+            client = self._get_client(base_url, api_key)
+            model_name = model or settings.openai_model
 
             response = await client.chat.completions.create(
-                model=settings.openai_model,
+                model=model_name,
                 messages=[{
                     "role": "user",
                     "content": [
@@ -95,15 +100,27 @@ class OpenAIService:
                 temperature=settings.openai_temperature,
             )
 
-            result_text = response.choices[0].message.content
+        # Parse response outside semaphore so other tasks can start
+        result_text = response.choices[0].message.content
+        try:
             result = json.loads(result_text)
-
-            await asyncio.sleep(self.min_interval)
-
+        except json.JSONDecodeError:
             return {
-                "overall_score": float(result.get("overall_score", 0)),
-                "is_portrait": bool(result.get("is_portrait", False)),
-                "quality_issues": result.get("quality_issues", []),
-                "ai_comment": result.get("comment", ""),
+                "overall_score": 0,
+                "is_portrait": False,
+                "quality_issues": [],
+                "ai_comment": "AI response could not be parsed",
                 "assessed_at": datetime.now().isoformat(),
+                "error": True,
             }
+
+        # Rate-limit inter-request delay (outside semaphore)
+        await asyncio.sleep(self.min_interval)
+
+        return {
+            "overall_score": float(result.get("overall_score", 0)),
+            "is_portrait": bool(result.get("is_portrait", False)),
+            "quality_issues": result.get("quality_issues", []),
+            "ai_comment": str(result.get("comment", ""))[:500],
+            "assessed_at": datetime.now().isoformat(),
+        }
