@@ -127,7 +127,7 @@ def browse_parent_folder(folder_path: str) -> dict:
                 has_images = False
                 try:
                     has_images = any(
-                        f.is_file() and f.suffix.lower() in ext_set
+                        f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS
                         for f in item.iterdir()
                     )
                 except PermissionError:

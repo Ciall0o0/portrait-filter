@@ -18,17 +18,39 @@ const CONNECT_TIMEOUT_SECS: u64 = 2;
 
 struct BackendProcess(Mutex<Option<Child>>);
 
-fn find_backend_binary() -> Option<PathBuf> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-
-    let candidates = [
-        exe_dir.join("portrait-filter-backend-x86_64-pc-windows-msvc.exe"),
-        exe_dir.join("portrait-filter-backend.exe"),
-        exe_dir.join("backend").join("portrait-filter-backend-x86_64-pc-windows-msvc.exe"),
-        exe_dir.join("backend").join("portrait-filter-backend.exe"),
+fn find_backend_binary(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let triple = "x86_64-pc-windows-msvc";
+    let names = [
+        format!("portrait-filter-backend-{triple}.exe"),
+        "portrait-filter-backend.exe".into(),
     ];
 
-    candidates.into_iter().find(|p| p.exists())
+    // Search paths: exe directory, CWD, resource directory, app data
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let resource_dir = app.path().resource_dir().unwrap_or_default();
+
+    let search_dirs = [
+        exe_dir.clone(),
+        cwd,
+        resource_dir,
+        exe_dir.join("backend"),
+    ];
+
+    for dir in &search_dirs {
+        for name in &names {
+            let path = dir.join(name);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    eprintln!(
+        "Backend binary not found. Searched: {:?} in: {:?}",
+        names, search_dirs
+    );
+    None
 }
 
 fn spawn_backend_child(app: &tauri::AppHandle) -> Option<Child> {
@@ -60,7 +82,7 @@ fn spawn_backend_child(app: &tauri::AppHandle) -> Option<Child> {
             .spawn()
             .ok()
     } else {
-        let exe = find_backend_binary()?;
+        let exe = find_backend_binary(app)?;
         let data_dir = app.path().app_data_dir().ok()?;
 
         // Ensure data directory exists (.env, cache.db, .trash_backup go here)
@@ -155,6 +177,12 @@ fn main() {
 
             let Some(mut child) = spawn_backend_child(&handle) else {
                 eprintln!("Failed to start Python backend");
+                let _ = app
+                    .dialog()
+                    .message("后端启动失败。\n\n可能原因：\n1. 杀毒软件拦截了 portrait-filter-backend.exe\n2. 后端文件未正确安装\n3. 未安装 Python/uv 环境（开发模式）")
+                    .title("后端启动失败")
+                    .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+                    .blocking_show();
                 return Ok(());
             };
 
