@@ -12,16 +12,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ---- Node.js (frontend + electron-builder) ----
+      # ---- Node.js (frontend) ----
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install frontend deps and build
-        run: |
-          cd frontend
-          npm ci
-          npm run build
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            frontend/node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Install frontend deps
+        run: cd frontend && npm ci --prefer-offline
+
+      # ---- Rust (Tauri) ----
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: rust-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: rust-${{ runner.os }}-
 
       # ---- Python (backend + PyInstaller) ----
       - uses: actions/setup-python@v5
@@ -31,18 +51,21 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install backend deps
-        env:
-          UV_DEFAULT_INDEX: https://pypi.org/simple/
-        run: |
-          cd backend
-          uv sync
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            backend/.venv
+          key: uv-${{ runner.os }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: uv-${{ runner.os }}-
 
       - name: Build backend with PyInstaller
         env:
           UV_DEFAULT_INDEX: https://pypi.org/simple/
         run: |
           cd backend
+          uv sync
           uv run pyinstaller `
             --onefile `
             --name portrait-filter-backend `
@@ -61,16 +84,19 @@ jobs:
             --hidden-import fastapi `
             launcher.py
 
-      # ---- Electron packaging ----
-      - name: Install electron deps and build
-        run: |
-          cd electron
-          npm ci
-          npm run build:win
+      # ---- Tauri build (compiles Rust + bundles NSIS installer) ----
+      - name: Build Tauri app
+        run: cd frontend && npm run tauri build
 
       # ---- Upload artifact ----
-      - name: Upload EXE
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Portrait-Filter-Windows
-          path: electron/dist/*.exe
+          name: Portrait-Filter-Windows-Installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+
+      - name: Upload portable EXE (standalone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Portrait-Filter-Windows-Portable
+          path: src-tauri/target/release/portrait-filter.exe

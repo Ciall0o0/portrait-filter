@@ -7,7 +7,8 @@ backend/cache.db
 backend/dist/
 backend/build/
 backend/*.spec
-electron/dist/
 *.pyc
+src-tauri/target/
+src-tauri/gen/
 .env
 .DS_Store

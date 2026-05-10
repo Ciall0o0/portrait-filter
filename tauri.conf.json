@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-v2-schema/refs/heads/main/tauri.schema.json",
+  "productName": "Portrait Filter",
+  "version": "0.1.0",
+  "identifier": "com.portrait-filter.app",
+  "build": {
+    "frontendDist": "frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd frontend && npm run dev",
+    "beforeBuildCommand": "cd frontend && npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Portrait Filter - 人像摄影批量筛选",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "src-tauri/icons/32x32.png",
+      "src-tauri/icons/128x128.png",
+      "src-tauri/icons/128x128@2x.png",
+      "src-tauri/icons/icon.icns",
+      "src-tauri/icons/icon.ico"
+    ],
+    "externalBin": [
+      "backend/dist/portrait-filter-backend"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

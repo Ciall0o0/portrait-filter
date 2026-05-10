@@ -8,17 +8,12 @@ import type {
   AppConfig,
 } from "../types";
 
-const BACKEND_PORT = 18903;
+export const BACKEND_PORT = 18903;
 const api = axios.create({
   baseURL: `http://127.0.0.1:${BACKEND_PORT}/api`,
 });
 
 // Folders
-export async function openFolder(path: string): Promise<FolderBrowseResult> {
-  const { data } = await api.post("/folders/open", { path });
-  return data;
-}
-
 export async function browseFolder(path: string): Promise<FolderBrowseResult> {
   const { data } = await api.get("/folders/browse", { params: { path } });
   return data;
@@ -92,7 +87,7 @@ export async function getConfig(): Promise<AppConfig> {
   return data;
 }
 
-export async function updateConfig(updates: Record<string, unknown>): Promise<void> {
+export async function updateConfig(updates: Partial<AppConfig>): Promise<void> {
   await api.put("/config", updates);
 }
 

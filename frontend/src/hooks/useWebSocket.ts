@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { BatchStatus } from "../types";
+import { BACKEND_PORT } from "../api/endpoints";
 
 const MAX_RETRIES = 5;
 const BASE_DELAY = 2000;
@@ -16,7 +17,7 @@ export function useWebSocket(
   const connect = useCallback(() => {
     if (!batchId || cancelled.current) return;
 
-    const wsUrl = `ws://127.0.0.1:18903/api/assess/ws/batch/${batchId}`;
+    const wsUrl = `ws://127.0.0.1:${BACKEND_PORT}/api/assess/ws/batch/${batchId}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

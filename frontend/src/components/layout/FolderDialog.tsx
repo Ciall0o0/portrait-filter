@@ -36,11 +36,10 @@ export default function FolderDialog({ open, onClose, onFolderSelected }: Props)
 
   useEffect(() => {
     if (open) {
-      const homeDir = typeof window !== "undefined" && (window as any).electronAPI?.platform === "win32"
-        ? "C:\\" : "/";
-      setPath(currentFolder || homeDir);
       if (currentFolder) {
         loadFolder(currentFolder);
+      } else {
+        setPath(navigator.platform.includes("Win") ? "C:\\" : "/");
       }
     }
   }, [open, currentFolder]);

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-v2-schema/refs/heads/main/capabilities-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for Portrait Filter",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "os:default"
+  ]
+}

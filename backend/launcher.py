@@ -4,8 +4,8 @@ import os
 
 def main():
     # Do NOT chdir — respect the CWD set by the parent process.
-    # - Electron production: cwd = app.getPath("userData") (persistent, writable)
-    # - Electron dev:       cwd = backendDir (the backend source tree)
+    # - Production: cwd = app_data_dir (persistent, writable)
+    # - Dev:        cwd = backendDir (the backend source tree)
     # .env / cache.db / .trash_backup are all resolved relative to CWD.
     port = int(os.environ.get("BACKEND_PORT", "18903"))
 

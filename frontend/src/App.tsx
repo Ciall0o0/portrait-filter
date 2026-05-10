@@ -1,7 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { ThemeProvider, CssBaseline, Box, Typography, Alert } from "@mui/material";
-import { SnackbarProvider } from "notistack";
-
 import theme from "./theme";
 import { useAppStore } from "./store/appStore";
 import { listImages, getConfig } from "./api/endpoints";
@@ -87,8 +85,7 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SnackbarProvider maxSnack={3}>
-        <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+      <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
           <AppBarTop
             onOpenFolder={() => setFolderOpen(true)}
             onOpenSettings={() => setConfigOpen(true)}
@@ -197,7 +194,6 @@ export default function App() {
         />
         <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
         <UndoSnackbar />
-      </SnackbarProvider>
     </ThemeProvider>
   );
 }
