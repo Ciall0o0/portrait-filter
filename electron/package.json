@@ -1,0 +1,43 @@
+{
+  "name": "portrait-filter-electron",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:win": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.portrait-filter.app",
+    "productName": "Portrait Filter",
+    "files": [
+      "main.js",
+      "preload.js",
+      "../frontend/dist/**/*",
+      "../backend/**/*",
+      "!../backend/.venv/**",
+      "!../backend/.trash_backup/**",
+      "!../backend/cache.db"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!.venv",
+          "!.trash_backup",
+          "!cache.db"
+        ]
+      }
+    ]
+  }
+}
