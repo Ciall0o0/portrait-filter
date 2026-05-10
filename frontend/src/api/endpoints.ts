@@ -9,6 +9,7 @@ import type {
 } from "../types";
 
 export const BACKEND_PORT = 18903;
+export const BACKEND_CONNECTION_ERROR = `无法连接到后端服务，请确认后端已在端口 ${BACKEND_PORT} 启动`;
 const api = axios.create({
   baseURL: `http://127.0.0.1:${BACKEND_PORT}/api`,
 });

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { ThemeProvider, CssBaseline, Box, Typography, Alert } from "@mui/material";
 import theme from "./theme";
 import { useAppStore } from "./store/appStore";
-import { listImages, getConfig } from "./api/endpoints";
+import { listImages, getConfig, BACKEND_CONNECTION_ERROR } from "./api/endpoints";
 import { useAssessment } from "./hooks/useAssessment";
 
 import AppBarTop from "./components/layout/AppBarTop";
@@ -67,7 +67,7 @@ export default function App() {
         setImages(res.images || []);
       } catch {
         setImages([]);
-        setFolderError("无法连接到后端服务，请确认后端已在端口 18903 启动");
+        setFolderError(BACKEND_CONNECTION_ERROR);
       }
     },
     [setCurrentFolder, setImages]
@@ -109,9 +109,15 @@ export default function App() {
             onOpenExport={() => setExportOpen(true)}
           />
 
+          {backendOk === null && (
+            <Alert severity="info" sx={{ mx: 2, mt: 1 }}>
+              正在连接后端服务...
+            </Alert>
+          )}
+
           {backendOk === false && (
-            <Alert severity="error" sx={{ mx: 2, mt: 1, borderRadius: 3 }}>
-              无法连接到后端服务 — 请确认后端已在端口 18903 启动
+            <Alert severity="error" sx={{ mx: 2, mt: 1 }}>
+              {BACKEND_CONNECTION_ERROR}
             </Alert>
           )}
 

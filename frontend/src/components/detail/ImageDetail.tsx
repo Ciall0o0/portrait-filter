@@ -21,16 +21,19 @@ export default function ImageDetail() {
   const result = useAppStore((s) =>
     detailImageId ? s.results[detailImageId] : null
   );
+  const config = useAppStore((s) => s.config);
   const image = useAppStore((s) =>
     detailImageId ? s.images.find((i) => i.id === detailImageId) : null
   );
 
   if (!detailImageId) return null;
 
+  const tGood = config?.quality_threshold_good ?? 80;
+  const tWarn = config?.quality_threshold_warn ?? 50;
   const scoreColor =
-    (result?.overall_score ?? 0) >= 80
+    (result?.overall_score ?? 0) >= tGood
       ? "success"
-      : (result?.overall_score ?? 0) >= 50
+      : (result?.overall_score ?? 0) >= tWarn
         ? "warning"
         : "error";
 

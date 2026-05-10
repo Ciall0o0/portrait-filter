@@ -24,12 +24,10 @@ export default function ImageCard({ image, onClick }: Props) {
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
-  const selectedIds = useAppStore((s) => s.selectedIds);
+  const isSelected = useAppStore((s) => s.selectedIds.has(image.id));
   const toggleSelect = useAppStore((s) => s.toggleSelect);
   const result = useAppStore((s) => s.results[image.id]);
   const config = useAppStore((s) => s.config);
-
-  const isSelected = selectedIds.has(image.id);
 
   const loadThumbnail = useCallback(() => {
     let cancelled = false;
@@ -75,10 +73,11 @@ export default function ImageCard({ image, onClick }: Props) {
         borderColor: isSelected ? "primary.main" : "divider",
         borderRadius: 3,
         overflow: "hidden",
-        transition: "border-color 200ms ease, box-shadow 200ms ease",
+        transition: "outline-color 200ms ease, border-color 200ms ease",
+        outline: isSelected ? 2 : 0,
+        outlineColor: "primary.main",
         "&:hover": {
-          borderColor: isSelected ? "primary.main" : "grey.600",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+          borderColor: isSelected ? "primary.main" : "divider",
         },
       }}
       onClick={onClick}

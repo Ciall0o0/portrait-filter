@@ -20,7 +20,7 @@ import {
   ArrowUpward as UpIcon,
 } from "@mui/icons-material";
 import { useAppStore } from "../../store/appStore";
-import { browseFolder } from "../../api/endpoints";
+import { browseFolder, BACKEND_CONNECTION_ERROR } from "../../api/endpoints";
 import type { FolderBrowseResult } from "../../types";
 
 interface Props {
@@ -64,7 +64,7 @@ export default function FolderDialog({ open, onClose, onFolderSelected }: Props)
       }
     } catch {
       setBrowse(null);
-      setError("无法连接到后端服务，请确认后端已在端口 18903 启动");
+      setError(BACKEND_CONNECTION_ERROR);
     } finally {
       setLoading(false);
     }

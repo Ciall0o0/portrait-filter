@@ -63,8 +63,8 @@ export default function ConfigDialog({ open, onClose }: Props) {
       });
       setSaved(true);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
-    } catch {
-      // Config save failure is non-critical
+    } catch (e) {
+      console.error("Config save failed:", e);
     }
     onClose();
   };

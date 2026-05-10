@@ -57,8 +57,8 @@ class OpenAIService:
         return response.choices is not None and len(response.choices) > 0
 
     def _encode_image_sync(self, image_path: Path) -> str:
-        img = Image.open(image_path)
-        img = img.convert("RGB")
+        with Image.open(image_path) as src:
+            img = src.convert("RGB")
         ratio = settings.max_image_dim / max(img.width, img.height)
         if ratio < 1.0:
             new_size = (int(img.width * ratio), int(img.height * ratio))

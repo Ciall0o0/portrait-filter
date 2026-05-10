@@ -10,6 +10,9 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+# Module-level constant — settings.supported_extensions never change at runtime
+IMAGE_EXTENSIONS = {ext.lower() for ext in settings.supported_extensions}
+
 
 def compute_sha256(file_path: Path) -> str:
     sha256 = hashlib.sha256()
@@ -31,10 +34,9 @@ def image_to_base64_bytes(raw: bytes) -> str:
 
 def _read_metadata(file_path: Path) -> dict:
     stat = file_path.stat()
-    img = Image.open(file_path)
-    width, height = img.size
-    img_format = img.format or file_path.suffix.upper().lstrip(".")
-    img.close()
+    with Image.open(file_path) as img:
+        width, height = img.size
+        img_format = img.format or file_path.suffix.upper().lstrip(".")
     return {
         "id": compute_sha256(file_path),
         "path": str(file_path.resolve()),
@@ -48,11 +50,10 @@ def _read_metadata(file_path: Path) -> dict:
 
 def scan_folder(folder_path: str) -> list[dict]:
     folder = Path(folder_path)
-    ext_set = {ext.lower() for ext in settings.supported_extensions}
     images = []
     try:
         for file_path in folder.iterdir():
-            if file_path.is_file() and file_path.suffix.lower() in ext_set:
+            if file_path.is_file() and file_path.suffix.lower() in IMAGE_EXTENSIONS:
                 try:
                     images.append(_read_metadata(file_path))
                 except Exception:
@@ -74,25 +75,28 @@ def generate_thumbnail_base64(file_path: str, size: int | None = None) -> str | 
     if size is None:
         size = settings.thumbnail_size
 
-    # Check disk cache
+    source_path = Path(file_path)
     cache_path = _thumbnail_cache_path(file_path, size)
-    file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else 0
-    if cache_path.exists():
+    source_mtime = source_path.stat().st_mtime if source_path.exists() else 0
+
+    # Check disk cache with mtime-based invalidation
+    if cache_path.exists() and source_mtime > 0:
         try:
-            cached = cache_path.read_bytes()
-            if len(cached) > 0:
-                return base64.b64encode(cached).decode()
+            cache_mtime = cache_path.stat().st_mtime
+            if cache_mtime >= source_mtime:
+                cached = cache_path.read_bytes()
+                if len(cached) > 0:
+                    return image_to_base64_bytes(cached)
         except OSError:
             cache_path.unlink(missing_ok=True)
 
     # Generate thumbnail
     try:
-        img = Image.open(file_path)
-        img = img.convert("RGB")
-        img.thumbnail((size, size), Image.LANCZOS)
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=80)
-        img.close()
+        with Image.open(source_path) as img:
+            img = img.convert("RGB")
+            img.thumbnail((size, size), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=80)
         raw = buf.getvalue()
 
         # Save to disk cache
@@ -103,19 +107,12 @@ def generate_thumbnail_base64(file_path: str, size: int | None = None) -> str | 
 
         return image_to_base64_bytes(raw)
     except Exception:
-        return None
-
-
-def get_image_info_dict(file_path: str) -> dict | None:
-    try:
-        return _read_metadata(Path(file_path))
-    except (FileNotFoundError, OSError):
+        logger.exception("Failed to generate thumbnail: %s", file_path)
         return None
 
 
 def browse_parent_folder(folder_path: str) -> dict:
     target = Path(folder_path).resolve()
-    ext_set = {ext.lower() for ext in settings.supported_extensions}
 
     result = {
         "current": str(target),
