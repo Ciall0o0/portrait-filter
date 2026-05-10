@@ -32,11 +32,15 @@ jobs:
         run: pip install uv
 
       - name: Install backend deps
+        env:
+          UV_DEFAULT_INDEX: https://pypi.org/simple/
         run: |
           cd backend
           uv sync
 
       - name: Build backend with PyInstaller
+        env:
+          UV_DEFAULT_INDEX: https://pypi.org/simple/
         run: |
           cd backend
           uv run pyinstaller `
