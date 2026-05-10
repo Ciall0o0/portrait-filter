@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter
 
 from config import settings
+from services.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -43,6 +44,24 @@ def _write_env(updates: dict) -> None:
         if key not in seen and field in updates:
             new_lines.append(f"{key}={updates[field]}")
     ENV_FILE.write_text("\n".join(new_lines) + "\n")
+
+
+@router.post("/test")
+async def test_connection(params: dict):
+    """Test the OpenAI-compatible API connection with the given credentials."""
+    try:
+        service = OpenAIService()
+        ok = await service.test_connection(
+            base_url=params.get("openai_base_url", settings.openai_base_url),
+            api_key=params.get("openai_api_key") or settings.openai_api_key,
+            model=params.get("openai_model", settings.openai_model),
+        )
+        return {"ok": ok} if ok else {"ok": False, "error": "API 返回了错误响应"}
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        logger.exception("Connection test failed")
+        return {"ok": False, "error": f"连接失败: {e}"}
 
 
 @router.get("")

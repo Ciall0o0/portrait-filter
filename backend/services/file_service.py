@@ -1,11 +1,14 @@
 import base64
 import hashlib
 import io
+import logging
 from pathlib import Path
 
 from PIL import Image
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def compute_sha256(file_path: Path) -> str:
@@ -20,6 +23,10 @@ def image_to_base64(img: Image.Image, quality: int = 85) -> str:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=quality)
     return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
+
+def image_to_base64_bytes(raw: bytes) -> str:
+    return f"data:image/jpeg;base64,{base64.b64encode(raw).decode()}"
 
 
 def _read_metadata(file_path: Path) -> dict:
@@ -55,16 +62,46 @@ def scan_folder(folder_path: str) -> list[dict]:
     return images
 
 
+def _thumbnail_cache_path(file_path: str, size: int) -> Path:
+    """Return a cache path for a thumbnail based on file path hash and size."""
+    key = hashlib.sha256(f"{file_path}:{size}".encode()).hexdigest()
+    cache_dir = Path(".thumb_cache")
+    cache_dir.mkdir(exist_ok=True)
+    return cache_dir / key
+
+
 def generate_thumbnail_base64(file_path: str, size: int | None = None) -> str | None:
     if size is None:
         size = settings.thumbnail_size
+
+    # Check disk cache
+    cache_path = _thumbnail_cache_path(file_path, size)
+    file_mtime = Path(file_path).stat().st_mtime if Path(file_path).exists() else 0
+    if cache_path.exists():
+        try:
+            cached = cache_path.read_bytes()
+            if len(cached) > 0:
+                return base64.b64encode(cached).decode()
+        except OSError:
+            cache_path.unlink(missing_ok=True)
+
+    # Generate thumbnail
     try:
         img = Image.open(file_path)
         img = img.convert("RGB")
         img.thumbnail((size, size), Image.LANCZOS)
-        result = image_to_base64(img, quality=80)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=80)
         img.close()
-        return result
+        raw = buf.getvalue()
+
+        # Save to disk cache
+        try:
+            cache_path.write_bytes(raw)
+        except OSError:
+            pass  # cache write failure is non-critical
+
+        return image_to_base64_bytes(raw)
     except Exception:
         return None
 
@@ -97,13 +134,13 @@ def browse_parent_folder(folder_path: str) -> dict:
                         for f in item.iterdir()
                     )
                 except PermissionError:
-                    pass
+                    logger.warning("Permission denied scanning subdir: %s", item)
                 result["subdirs"].append({
                     "name": item.name,
                     "path": str(item.resolve()),
                     "has_images": has_images,
                 })
     except PermissionError:
-        pass
+        logger.warning("Permission denied accessing: %s", folder_path)
 
     return result

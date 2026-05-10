@@ -5,17 +5,14 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
   Slider,
   Typography,
   Button,
   Box,
-  FormControl,
-  InputLabel,
   Alert,
+  CircularProgress,
 } from "@mui/material";
-import { getConfig, updateConfig } from "../../api/endpoints";
+import { getConfig, updateConfig, testConnection } from "../../api/endpoints";
 import { useAppStore } from "../../store/appStore";
 
 interface Props {
@@ -33,10 +30,13 @@ export default function ConfigDialog({ open, onClose }: Props) {
   const [thresholdGood, setThresholdGood] = useState(80);
   const [thresholdWarn, setThresholdWarn] = useState(50);
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
+      setTestResult(null);
       getConfig().then((c) => {
         setBaseUrl(c.openai_base_url);
         setModel(c.openai_model);
@@ -69,6 +69,23 @@ export default function ConfigDialog({ open, onClose }: Props) {
     onClose();
   };
 
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testConnection({
+        openai_api_key: apiKey || undefined,
+        openai_base_url: baseUrl,
+        openai_model: model,
+      });
+      setTestResult({ ok: res.ok, message: res.ok ? "连接成功 — API 响应正常" : (res.error || "连接失败") });
+    } catch {
+      setTestResult({ ok: false, message: "无法连接到后端服务" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>设置</DialogTitle>
@@ -96,14 +113,15 @@ export default function ConfigDialog({ open, onClose }: Props) {
           helperText="支持任何兼容 OpenAI Chat Completions 的 API"
         />
 
-        <FormControl fullWidth margin="normal" size="small">
-          <InputLabel>模型</InputLabel>
-          <Select value={model} label="模型" onChange={(e) => setModel(e.target.value)}>
-            <MenuItem value="gpt-4o-mini">gpt-4o-mini (推荐，成本低)</MenuItem>
-            <MenuItem value="gpt-4o">gpt-4o (高精度)</MenuItem>
-            <MenuItem value="Qwen/QVQ-72B-Preview">Qwen/QVQ-72B (通义千问视觉)</MenuItem>
-          </Select>
-        </FormControl>
+        <TextField
+          label="模型"
+          fullWidth
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          margin="normal"
+          size="small"
+          helperText="输入模型名称，如 gpt-4o-mini / gpt-4o / claude-3-opus 等"
+        />
 
         <Box sx={{ mt: 2 }}>
           <Typography gutterBottom>并发批处理数量: {batchSize}</Typography>
@@ -147,9 +165,24 @@ export default function ConfigDialog({ open, onClose }: Props) {
           </Typography>
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>取消</Button>
-        <Button variant="contained" onClick={handleSave}>保存</Button>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
+        {testResult && (
+          <Alert
+            severity={testResult.ok ? "success" : "error"}
+            sx={{ width: "100%", borderRadius: 2 }}
+            onClose={() => setTestResult(null)}
+          >
+            {testResult.message}
+          </Alert>
+        )}
+        <Box sx={{ display: "flex", gap: 1, ml: "auto" }}>
+          <Button onClick={onClose}>取消</Button>
+          <Button onClick={handleTest} disabled={testing} color="info">
+            {testing ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}
+            测试连接
+          </Button>
+          <Button variant="contained" onClick={handleSave}>保存</Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

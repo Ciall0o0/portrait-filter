@@ -91,6 +91,15 @@ export async function updateConfig(updates: Partial<AppConfig>): Promise<void> {
   await api.put("/config", updates);
 }
 
+export async function testConnection(params: {
+  openai_api_key?: string;
+  openai_base_url: string;
+  openai_model: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { data } = await api.post("/config/test", params);
+  return data;
+}
+
 // Export
 export async function exportReport(
   folder: string,

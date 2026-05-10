@@ -13,6 +13,7 @@ import {
   Typography,
   IconButton,
   Box,
+  Alert,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -32,10 +33,12 @@ export default function FolderDialog({ open, onClose, onFolderSelected }: Props)
   const [path, setPath] = useState("");
   const [browse, setBrowse] = useState<FolderBrowseResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const currentFolder = useAppStore((s) => s.currentFolder);
 
   useEffect(() => {
     if (open) {
+      setError("");
       if (currentFolder) {
         loadFolder(currentFolder);
       } else {
@@ -45,19 +48,29 @@ export default function FolderDialog({ open, onClose, onFolderSelected }: Props)
   }, [open, currentFolder]);
 
   const loadFolder = async (p: string) => {
+    const trimmed = p.trim();
+    if (!trimmed) {
+      setError("请输入文件夹路径");
+      return;
+    }
+    setPath(trimmed);
+    setError("");
     setLoading(true);
     try {
-      const result = await browseFolder(p);
+      const result = await browseFolder(trimmed);
       setBrowse(result);
-      setPath(p);
+      if (!result.exists) {
+        setError("目录不存在，请检查路径是否正确");
+      }
     } catch {
       setBrowse(null);
+      setError("无法连接到后端服务，请确认后端已在端口 18903 启动");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNavigate = async () => {
+  const handleNavigate = () => {
     loadFolder(path);
   };
 
@@ -89,6 +102,12 @@ export default function FolderDialog({ open, onClose, onFolderSelected }: Props)
             </IconButton>
           )}
         </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 1, borderRadius: 2 }} onClose={() => setError("")}>
+            {error}
+          </Alert>
+        )}
 
         {browse?.exists && (
           <List dense sx={{ maxHeight: 300, overflow: "auto", mt: 1 }}>

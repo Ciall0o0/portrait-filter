@@ -21,7 +21,8 @@ export default function App() {
   const [configOpen, setConfigOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [backendOk, setBackendOk] = useState<boolean | null>(null); // null = checking
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const [folderError, setFolderError] = useState("");
 
   const currentFolder = useAppStore((s) => s.currentFolder);
   const setCurrentFolder = useAppStore((s) => s.setCurrentFolder);
@@ -60,11 +61,13 @@ export default function App() {
   const handleFolderSelected = useCallback(
     async (path: string) => {
       setCurrentFolder(path);
+      setFolderError("");
       try {
         const res = await listImages(path, 1, 500);
         setImages(res.images || []);
       } catch {
         setImages([]);
+        setFolderError("无法连接到后端服务，请确认后端已在端口 18903 启动");
       }
     },
     [setCurrentFolder, setImages]
@@ -109,6 +112,16 @@ export default function App() {
           {backendOk === false && (
             <Alert severity="error" sx={{ mx: 2, mt: 1, borderRadius: 3 }}>
               无法连接到后端服务 — 请确认后端已在端口 18903 启动
+            </Alert>
+          )}
+
+          {folderError && (
+            <Alert
+              severity="error"
+              sx={{ mx: 2, mt: 1, borderRadius: 3 }}
+              onClose={() => setFolderError("")}
+            >
+              {folderError}
             </Alert>
           )}
 

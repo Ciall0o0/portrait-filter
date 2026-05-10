@@ -42,6 +42,20 @@ class OpenAIService:
             )
         return self._client
 
+    async def test_connection(self, base_url: str, api_key: str, model: str) -> bool:
+        """Test connectivity to the OpenAI-compatible API."""
+        if not api_key:
+            raise ValueError("API Key 未设置")
+        client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=15.0)
+        # Send a minimal chat completion request to verify credentials
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+            temperature=0,
+        )
+        return response.choices is not None and len(response.choices) > 0
+
     def _encode_image_sync(self, image_path: Path) -> str:
         img = Image.open(image_path)
         img = img.convert("RGB")

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardMedia,
@@ -7,7 +7,9 @@ import {
   Checkbox,
   Box,
   Skeleton,
+  IconButton,
 } from "@mui/material";
+import { Refresh as RefreshIcon } from "@mui/icons-material";
 import { useAppStore } from "../../store/appStore";
 import { getThumbnail } from "../../api/endpoints";
 import type { ImageInfo } from "../../types";
@@ -21,6 +23,7 @@ interface Props {
 export default function ImageCard({ image, onClick }: Props) {
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const selectedIds = useAppStore((s) => s.selectedIds);
   const toggleSelect = useAppStore((s) => s.toggleSelect);
   const result = useAppStore((s) => s.results[image.id]);
@@ -28,8 +31,9 @@ export default function ImageCard({ image, onClick }: Props) {
 
   const isSelected = selectedIds.has(image.id);
 
-  useEffect(() => {
+  const loadThumbnail = useCallback(() => {
     let cancelled = false;
+    setLoading(true);
     getThumbnail(image.id, image.path)
       .then((res) => {
         if (!cancelled) {
@@ -38,10 +42,29 @@ export default function ImageCard({ image, onClick }: Props) {
         }
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          // auto-retry once after 2s
+          if (retryCount === 0) {
+            setTimeout(() => {
+              if (!cancelled) {
+                setRetryCount(1);
+              }
+            }, 2000);
+          }
+        }
       });
     return () => { cancelled = true; };
-  }, [image.id, image.path]);
+  }, [image.id, image.path, retryCount]);
+
+  useEffect(() => {
+    return loadThumbnail();
+  }, [loadThumbnail]);
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRetryCount((c) => c + 1);
+  };
 
   return (
     <Card
@@ -103,13 +126,18 @@ export default function ImageCard({ image, onClick }: Props) {
           sx={{
             height: 200,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             bgcolor: "grey.800",
             color: "grey.500",
+            gap: 1,
           }}
         >
           <Typography variant="body2">加载失败</Typography>
+          <IconButton size="small" onClick={handleRetry} sx={{ color: "grey.400" }}>
+            <RefreshIcon fontSize="small" />
+          </IconButton>
         </Box>
       )}
 
