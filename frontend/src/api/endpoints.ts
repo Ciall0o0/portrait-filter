@@ -8,8 +8,9 @@ import type {
   AppConfig,
 } from "../types";
 
+const BACKEND_PORT = 18903;
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: `http://127.0.0.1:${BACKEND_PORT}/api`,
 });
 
 // Folders

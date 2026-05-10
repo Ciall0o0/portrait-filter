@@ -63,7 +63,14 @@ function startPythonBackend() {
   pythonProcess.stderr.on("data", logOutput);
 
   pythonProcess.on("error", (err) => {
-    console.error("Failed to start Python backend:", err.message);
+    console.error("Failed to start backend:", err.message);
+    if (err.message.includes("ENOENT") || err.message.includes("uv")) {
+      dialog.showErrorBox(
+        "后端启动失败",
+        "找不到后端程序。\n"
+        + (isDev ? "请确保已安装 uv (https://docs.astral.sh/uv/)" : "请检查安装是否完整。")
+      );
+    }
   });
 
   pythonProcess.on("close", (code) => {
@@ -154,8 +161,15 @@ app.whenReady().then(async () => {
   try {
     await waitForBackend();
     console.log("Backend is ready");
-  } catch {
-    console.warn("Backend health check timed out, creating window anyway");
+  } catch (e) {
+    console.warn("Backend health check timed out:", e.message);
+    dialog.showErrorBox(
+      "后端启动失败",
+      "无法连接到后端服务。请检查：\n"
+      + "1. 杀毒软件是否拦截了 portrait-filter-backend.exe\n"
+      + "2. 端口 18903 是否被其他程序占用\n"
+      + "3. 尝试重新启动应用"
+    );
   }
 
   createWindow();

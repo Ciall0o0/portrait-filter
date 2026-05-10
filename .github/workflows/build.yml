@@ -48,6 +48,13 @@ jobs:
             --hidden-import uvicorn.lifespan.auto `
             --hidden-import anyio._backends._asyncio `
             --hidden-import pydantic_settings `
+            --hidden-import aiosqlite `
+            --hidden-import openai `
+            --hidden-import httpx `
+            --hidden-import send2trash `
+            --hidden-import aiofiles `
+            --hidden-import PIL `
+            --hidden-import fastapi `
             launcher.py
 
       # ---- Electron packaging ----

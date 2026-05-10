@@ -16,8 +16,7 @@ export function useWebSocket(
   const connect = useCallback(() => {
     if (!batchId || cancelled.current) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl = `${protocol}://${window.location.host}/ws/batch/${batchId}`;
+    const wsUrl = `ws://127.0.0.1:18903/api/assess/ws/batch/${batchId}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
