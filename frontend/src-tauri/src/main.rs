@@ -160,11 +160,8 @@ fn main() {
 
             pipe_output(&mut child);
 
-            let mut guard = app
-                .state::<BackendProcess>()
-                .0
-                .lock()
-                .expect("BackendProcess mutex poisoned");
+            let state = app.state::<BackendProcess>();
+            let mut guard = state.0.lock().expect("BackendProcess mutex poisoned");
             *guard = Some(child);
             drop(guard);
 
