@@ -92,15 +92,25 @@ jobs:
       - name: Build Tauri app
         run: cd frontend && npm run tauri build
 
-      # ---- Upload artifact ----
-      - name: Upload installer
+      # ---- Create portable package (exe + backend) ----
+      - name: Create portable package
+        shell: pwsh
+        run: |
+          $portableDir = "portable\Portrait Filter"
+          New-Item -ItemType Directory -Force -Path $portableDir
+          Copy-Item "frontend\target\release\portrait-filter.exe" -Destination $portableDir
+          Copy-Item "backend\dist\portrait-filter-backend-x86_64-pc-windows-msvc.exe" -Destination $portableDir
+          Compress-Archive -Path $portableDir -DestinationPath "Portrait-Filter-Portable.zip"
+
+      # ---- Upload artifacts ----
+      - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
           name: Portrait-Filter-Windows-Installer
           path: frontend/target/release/bundle/nsis/*.exe
 
-      - name: Upload portable EXE (standalone)
+      - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Portrait-Filter-Windows-Portable
-          path: frontend/target/release/portrait-filter.exe
+          path: Portrait-Filter-Portable.zip
