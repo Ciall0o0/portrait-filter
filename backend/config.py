@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_max_tokens: int = 500
     openai_temperature: float = 0.0
+    openai_json_mode: bool = True  # disable for local models that don't support response_format
 
     batch_size: int = 5
     concurrency_limit: int = 2

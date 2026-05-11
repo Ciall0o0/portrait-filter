@@ -70,6 +70,7 @@ async def get_config():
         "openai_base_url": settings.openai_base_url,
         "openai_api_key": "***" if settings.openai_api_key else "",
         "openai_model": settings.openai_model,
+        "openai_json_mode": settings.openai_json_mode,
         "batch_size": settings.batch_size,
         "quality_threshold_good": settings.quality_threshold_good,
         "quality_threshold_warn": settings.quality_threshold_warn,
@@ -92,6 +93,9 @@ async def update_config(updates: dict):
         settings.quality_threshold_good = float(updates["quality_threshold_good"])
     if "quality_threshold_warn" in updates:
         settings.quality_threshold_warn = float(updates["quality_threshold_warn"])
+    if "openai_json_mode" in updates:
+        settings.openai_json_mode = bool(updates["openai_json_mode"])
+        env_updates["openai_json_mode"] = str(updates["openai_json_mode"]).lower()
 
     if env_updates:
         try:

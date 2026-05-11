@@ -11,6 +11,8 @@ import {
   Box,
   Alert,
   CircularProgress,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { getConfig, updateConfig, testConnection } from "../../api/endpoints";
 import { useAppStore } from "../../store/appStore";
@@ -29,6 +31,7 @@ export default function ConfigDialog({ open, onClose }: Props) {
   const [batchSize, setBatchSize] = useState(5);
   const [thresholdGood, setThresholdGood] = useState(80);
   const [thresholdWarn, setThresholdWarn] = useState(50);
+  const [jsonMode, setJsonMode] = useState(true);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -43,6 +46,7 @@ export default function ConfigDialog({ open, onClose }: Props) {
         setBatchSize(c.batch_size);
         setThresholdGood(c.quality_threshold_good);
         setThresholdWarn(c.quality_threshold_warn);
+        setJsonMode(c.openai_json_mode);
         setConfig(c);
       });
     }
@@ -60,6 +64,7 @@ export default function ConfigDialog({ open, onClose }: Props) {
         batch_size: batchSize,
         quality_threshold_good: thresholdGood,
         quality_threshold_warn: thresholdWarn,
+        openai_json_mode: jsonMode,
       });
       setSaved(true);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
@@ -121,6 +126,12 @@ export default function ConfigDialog({ open, onClose }: Props) {
           margin="normal"
           size="small"
           helperText="输入模型名称，如 gpt-4o-mini / gpt-4o / claude-3-opus 等"
+        />
+
+        <FormControlLabel
+          control={<Switch checked={jsonMode} onChange={(_, v) => setJsonMode(v)} />}
+          label="强制 JSON 输出 (本地模型如 LM Studio 需关闭)"
+          sx={{ mt: 2 }}
         />
 
         <Box sx={{ mt: 2 }}>

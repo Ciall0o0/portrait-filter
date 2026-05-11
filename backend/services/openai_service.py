@@ -75,53 +75,79 @@ class OpenAIService:
     async def _encode_image(self, image_path: Path) -> str:
         return await asyncio.to_thread(self._encode_image_sync, image_path)
 
+    @staticmethod
+    def _parse_json_response(raw: str | None) -> dict | None:
+        """Try to extract JSON from LLM response (may be wrapped in markdown)."""
+        if not raw:
+            return None
+        # Direct parse
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+        # Try stripping markdown code fences: ```json ... ```
+        import re
+        m = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except json.JSONDecodeError:
+                pass
+        # Try to find a JSON object anywhere in the text
+        m = re.search(r'\{[\s\S]*\}', raw)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except json.JSONDecodeError:
+                pass
+        return None
+
     async def assess_single(self, image_path: str, model: str | None = None) -> dict:
-        # Encode image BEFORE acquiring semaphore (I/O, no API rate limit)
         data_uri = await self._encode_image(Path(image_path))
         model_name = model or settings.openai_model
 
-        # Acquire semaphore for rate-limited API call
+        # Build request — skip response_format for local models
+        kwargs = dict(
+            model=model_name,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": PORTRAIT_QUALITY_PROMPT},
+                    {"type": "image_url", "image_url": {"url": data_uri, "detail": "low"}},
+                ],
+            }],
+            max_tokens=settings.openai_max_tokens,
+            temperature=settings.openai_temperature,
+        )
+        if settings.openai_json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
         async with self.semaphore:
             client = self._get_client()
+            response = await client.chat.completions.create(**kwargs)
 
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": PORTRAIT_QUALITY_PROMPT},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": data_uri,
-                                "detail": "low",
-                            },
-                        },
-                    ],
-                }],
-                response_format={"type": "json_object"},
-                max_tokens=settings.openai_max_tokens,
-                temperature=settings.openai_temperature,
-            )
+        result_text = (response.choices[0].message.content or "").strip()
 
-        # API call done — release semaphore so next task can proceed.
-        # Parse and rate-limit outside the critical section.
-        result_text = response.choices[0].message.content or ""
+        if not result_text:
+            import logging
+            logging.getLogger(__name__).warning("LLM returned empty response for %s", image_path)
+            return {
+                "overall_score": 0, "is_portrait": False,
+                "quality_issues": [], "ai_comment": "模型返回了空响应",
+                "assessed_at": datetime.now().isoformat(), "error": True,
+            }
 
-        try:
-            result = json.loads(result_text)
-        except json.JSONDecodeError:
+        result = self._parse_json_response(result_text)
+        if result is None:
             import logging
             logging.getLogger(__name__).warning(
-                "LLM returned non-JSON content: %.200s", result_text
+                "LLM returned non-JSON: %.300s", result_text
             )
             return {
-                "overall_score": 0,
-                "is_portrait": False,
+                "overall_score": 0, "is_portrait": False,
                 "quality_issues": [],
-                "ai_comment": f"AI returned unparseable response",
-                "assessed_at": datetime.now().isoformat(),
-                "error": True,
+                "ai_comment": f"模型返回了无法解析的响应: {result_text[:200]}",
+                "assessed_at": datetime.now().isoformat(), "error": True,
             }
 
         await asyncio.sleep(self.min_interval)

@@ -86,6 +86,7 @@ export type AppConfig = {
   openai_base_url: string;
   openai_api_key: string;
   openai_model: string;
+  openai_json_mode: boolean;
   batch_size: number;
   quality_threshold_good: number;
   quality_threshold_warn: number;
