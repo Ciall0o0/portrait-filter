@@ -29,23 +29,30 @@ Scoring guide:
 class OpenAIService:
     def __init__(self):
         self._client = None
+        self._client_config = None  # (url, key) tuple to detect config changes
         self.semaphore = asyncio.Semaphore(settings.concurrency_limit)
         self.min_interval = 60.0 / max(settings.rate_limit_per_min, 1)
-        self._last_call_time = 0.0
 
-    def _get_client(self, base_url: str = "", api_key: str = "") -> AsyncOpenAI:
-        url = base_url or settings.openai_base_url
-        key = api_key or settings.openai_api_key
-        if not key:
-            raise ValueError("OpenAI API key is not configured")
-        return AsyncOpenAI(base_url=url, api_key=key, timeout=60.0)
+    def _get_client(self) -> AsyncOpenAI:
+        """Return a cached client. Recreate only if config changed."""
+        config = (settings.openai_base_url, settings.openai_api_key)
+        if self._client is None or self._client_config != config:
+            if not settings.openai_api_key:
+                raise ValueError("OpenAI API key is not configured")
+            self._client = AsyncOpenAI(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                timeout=120.0,
+                max_retries=1,
+            )
+            self._client_config = config
+        return self._client
 
     async def test_connection(self, base_url: str, api_key: str, model: str) -> bool:
         """Test connectivity to the OpenAI-compatible API."""
         if not api_key:
             raise ValueError("API Key 未设置")
         client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=15.0)
-        # Send a minimal chat completion request to verify credentials
         response = await client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "ping"}],
@@ -68,17 +75,14 @@ class OpenAIService:
     async def _encode_image(self, image_path: Path) -> str:
         return await asyncio.to_thread(self._encode_image_sync, image_path)
 
-    async def assess_single(
-        self, image_path: str, model: str | None = None,
-        base_url: str = "", api_key: str = "",
-    ) -> dict:
+    async def assess_single(self, image_path: str, model: str | None = None) -> dict:
         # Encode image BEFORE acquiring semaphore (I/O, no API rate limit)
         data_uri = await self._encode_image(Path(image_path))
+        model_name = model or settings.openai_model
 
-        # Rate-limit: wait until we can make an API call
+        # Acquire semaphore for rate-limited API call
         async with self.semaphore:
-            client = self._get_client(base_url, api_key)
-            model_name = model or settings.openai_model
+            client = self._get_client()
 
             response = await client.chat.completions.create(
                 model=model_name,
@@ -100,27 +104,32 @@ class OpenAIService:
                 temperature=settings.openai_temperature,
             )
 
-        # Parse response outside semaphore so other tasks can start
-        result_text = response.choices[0].message.content
+        # API call done — release semaphore so next task can proceed.
+        # Parse and rate-limit outside the critical section.
+        result_text = response.choices[0].message.content or ""
+
         try:
             result = json.loads(result_text)
         except json.JSONDecodeError:
+            import logging
+            logging.getLogger(__name__).warning(
+                "LLM returned non-JSON content: %.200s", result_text
+            )
             return {
                 "overall_score": 0,
                 "is_portrait": False,
                 "quality_issues": [],
-                "ai_comment": "AI response could not be parsed",
+                "ai_comment": f"AI returned unparseable response",
                 "assessed_at": datetime.now().isoformat(),
                 "error": True,
             }
 
-        # Rate-limit inter-request delay (outside semaphore)
         await asyncio.sleep(self.min_interval)
 
         return {
             "overall_score": float(result.get("overall_score", 0)),
             "is_portrait": bool(result.get("is_portrait", False)),
-            "quality_issues": result.get("quality_issues", []),
+            "quality_issues": result.get("quality_issues", []) or [],
             "ai_comment": str(result.get("comment", ""))[:500],
             "assessed_at": datetime.now().isoformat(),
         }
