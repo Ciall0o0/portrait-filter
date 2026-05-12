@@ -1,5 +1,7 @@
 import asyncio
 import json
+import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +10,11 @@ from PIL import Image
 
 from config import settings
 from .file_service import image_to_base64
+
+logger = logging.getLogger(__name__)
+
+_MD_FENCE_RE = re.compile(r'```(?:json)?\s*([\s\S]*?)```')
+_JSON_OBJECT_RE = re.compile(r'\{[\s\S]*\}')
 
 PORTRAIT_QUALITY_PROMPT = """You are a professional portrait photography reviewer.
 Analyze the provided image and return a JSON object with these fields:
@@ -48,7 +55,8 @@ class OpenAIService:
             self._client_config = config
         return self._client
 
-    async def test_connection(self, base_url: str, api_key: str, model: str) -> bool:
+    @staticmethod
+    async def test_connection(base_url: str, api_key: str, model: str) -> bool:
         """Test connectivity to the OpenAI-compatible API."""
         if not api_key:
             raise ValueError("API Key 未设置")
@@ -64,13 +72,14 @@ class OpenAIService:
     def _encode_image_sync(self, image_path: Path) -> str:
         with Image.open(image_path) as src:
             img = src.convert("RGB")
-        ratio = settings.max_image_dim / max(img.width, img.height)
-        if ratio < 1.0:
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.LANCZOS)
-        result = image_to_base64(img, quality=85)
-        img.close()
-        return result
+        try:
+            ratio = settings.max_image_dim / max(img.width, img.height)
+            if ratio < 1.0:
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+            return image_to_base64(img, quality=85)
+        finally:
+            img.close()
 
     async def _encode_image(self, image_path: Path) -> str:
         return await asyncio.to_thread(self._encode_image_sync, image_path)
@@ -80,21 +89,17 @@ class OpenAIService:
         """Try to extract JSON from LLM response (may be wrapped in markdown)."""
         if not raw:
             return None
-        # Direct parse
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
             pass
-        # Try stripping markdown code fences: ```json ... ```
-        import re
-        m = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+        m = _MD_FENCE_RE.search(raw)
         if m:
             try:
                 return json.loads(m.group(1))
             except json.JSONDecodeError:
                 pass
-        # Try to find a JSON object anywhere in the text
-        m = re.search(r'\{[\s\S]*\}', raw)
+        m = _JSON_OBJECT_RE.search(raw)
         if m:
             try:
                 return json.loads(m.group(0))
@@ -102,11 +107,18 @@ class OpenAIService:
                 pass
         return None
 
+    @staticmethod
+    def _error_result(comment: str) -> dict:
+        return {
+            "overall_score": 0, "is_portrait": False,
+            "quality_issues": [], "ai_comment": comment,
+            "assessed_at": datetime.now().isoformat(), "error": True,
+        }
+
     async def assess_single(self, image_path: str, model: str | None = None) -> dict:
         data_uri = await self._encode_image(Path(image_path))
         model_name = model or settings.openai_model
 
-        # Build request — skip response_format for local models
         kwargs = dict(
             model=model_name,
             messages=[{
@@ -129,26 +141,13 @@ class OpenAIService:
         result_text = (response.choices[0].message.content or "").strip()
 
         if not result_text:
-            import logging
-            logging.getLogger(__name__).warning("LLM returned empty response for %s", image_path)
-            return {
-                "overall_score": 0, "is_portrait": False,
-                "quality_issues": [], "ai_comment": "模型返回了空响应",
-                "assessed_at": datetime.now().isoformat(), "error": True,
-            }
+            logger.warning("LLM returned empty response for %s", image_path)
+            return self._error_result("模型返回了空响应")
 
         result = self._parse_json_response(result_text)
         if result is None:
-            import logging
-            logging.getLogger(__name__).warning(
-                "LLM returned non-JSON: %.300s", result_text
-            )
-            return {
-                "overall_score": 0, "is_portrait": False,
-                "quality_issues": [],
-                "ai_comment": f"模型返回了无法解析的响应: {result_text[:200]}",
-                "assessed_at": datetime.now().isoformat(), "error": True,
-            }
+            logger.warning("LLM returned non-JSON: %.300s", result_text)
+            return self._error_result(f"模型返回了无法解析的响应: {result_text[:200]}")
 
         await asyncio.sleep(self.min_interval)
 

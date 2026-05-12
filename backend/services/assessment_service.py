@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import uuid
 
 from config import settings
 from db import cache_repo
 from services.file_service import compute_sha256
 from services.openai_service import OpenAIService
+
+logger = logging.getLogger(__name__)
 
 
 class AssessmentService:
@@ -43,14 +46,12 @@ class AssessmentService:
             if not force:
                 cached = await cache_repo.get_cached_result(file_hash, model)
                 if cached:
-                    cached["image_id"] = file_hash
-                    return cached
+                    return {**cached, "image_id": file_hash}
 
             try:
                 result = await self.openai_svc.assess_single(path, model=model)
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).exception("Assessment failed for %s", path)
+                logger.exception("Assessment failed for %s", path)
                 result = {
                     "overall_score": 0,
                     "is_portrait": False,
@@ -81,8 +82,7 @@ class AssessmentService:
             await asyncio.gather(*tasks)
             batch["status"] = "completed"
         except Exception:
-            import logging
-            logging.getLogger(__name__).exception("Batch %s failed", batch_id)
+            logger.exception("Batch %s failed", batch_id)
             batch["status"] = "error"
         finally:
             await progress_callback(self._status_dict(batch))
